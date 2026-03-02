@@ -112,43 +112,37 @@ check_child_return_one:
 #     %r13: last
 #
 heapify_node:
-	pushq  %rbx             # Save %rbx and use it to store index
+	pushq  %rbx
 	pushq  %r12
 	pushq  %r13
-	rrmovq %rdi, %r12       # %r12 = highest
-	rrmovq %rsi, %r13       # %r13 = last
+	rrmovq %rdi, %r12
+	rrmovq %rsi, %r13
 	rrmovq %rdi, %rbx
 
 heapify_loop:
-	rrmovq %rbx, %rdi       # left_child = 2 * index + 1
-	addq   %rdi, %rdi
-	irmovq $1,   %r8
-	addq   %r8,  %rdi
+	rrmovq %rbx, %rdi
+	addq   %rdi, %rdi       # left_child = 2 * index
+	addq   $1, %rdi         # left_child = 2 * index + 1
 	rrmovq %r12, %rsi
 	rrmovq %r13, %rdx
 
-	pushq  %rdi             # save this as we'll need it after the call
 	call   check_child
-	popq   %rdi
 	andq   %rax, %rax
 
-	je     heapify_skip1    # highest = left_child (if condition ok)
+	je     heapify_skip1
 	rrmovq %rdi, %r12       
 
 heapify_skip1:
-	rrmovq %rbx, %rdi       # right_child = 2 * index + 2
-	addq   %rdi, %rdi
-	irmovq $2,   %r8	
-	addq   %r8,  %rdi
+	rrmovq %rbx, %rdi
+	addq   %rdi, %rdi       # right_child = 2 * index
+	addq   $2, %rdi         # right_child = 2 * index + 2
 	rrmovq %r12, %rsi
 	rrmovq %r13, %rdx
 
-	pushq  %rdi             # save this as we'll need it after the call
 	call   check_child
-	popq  %rdi
 	andq   %rax, %rax
 	je     heapify_skip2
-	rrmovq %rdi, %r12       # highest = right_child (if condition ok)
+	rrmovq %rdi, %r12       
 
 heapify_skip2:
 	rrmovq %r12, %rdi
