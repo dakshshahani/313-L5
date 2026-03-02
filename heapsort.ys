@@ -167,15 +167,22 @@ heapify_continue:
 # Heapify_array
 #     %rdi: last
 #
+# Iterates i from last down to 0, calling heapify_node(i, last).
+# Calling heapify_node on leaf nodes is a no-op (no children in range),
+# so correctness is preserved while avoiding any division or shift.
+#
+# Local registers (callee-saved):
+#   %r12: last
+#   %r13: constant 1
+#   %rbx: i (counts down from last to 0)
+#
 heapify_array:
 	pushq  %r12
 	pushq  %r13
 	pushq  %rbx
-	rrmovq %rdi, %r12
-	irmovq $1, %r13         # %r13 = 1 (callee-saved; survives calls)
-	subq   %r13, %rdi       # %rdi = last - 1
-	shrq   %r13, %rdi       # %rdi = (last - 1) / 2 (shift right by 1)
-	rrmovq %rdi, %rbx       
+	rrmovq %rdi, %r12       # %r12 = last
+	irmovq $1, %r13         # %r13 = 1 (constant, callee-saved, survives calls)
+	rrmovq %rdi, %rbx       # i = last
 
 ha_loop:
 	andq   %rbx, %rbx       # set flags on i; SF=1 if i < 0
@@ -183,7 +190,7 @@ ha_loop:
 	rrmovq %rbx, %rdi
 	rrmovq %r12, %rsi
 	call   heapify_node
-	subq   %r13, %rbx       # i-- (%r13=1, callee-saved so survives call)
+	subq   %r13, %rbx       # i--
 	jmp    ha_loop
 
 ha_done:
