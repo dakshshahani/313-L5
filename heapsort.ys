@@ -166,32 +166,27 @@ heapify_continue:
 #     %rdi: last
 #
 heapify_array:
-	pushq  %r12             # Save %r12 and use it to store 'last'
-	pushq  %rbx             # Save %rbx before using it for i
+	pushq  %r12
+	pushq  %rbx
 	rrmovq %rdi, %r12
 
-	irmovq $1, %rsi		# %rdi = last - 1
-	subq   %rsi, %rdi
-	irmovq $2, %rsi		# %rdi = (last - 1)/2
-	divq   %rsi, %rdi
-	rrmovq %rdi, %rbx       # i = %rdi
+	subq   $1, %rdi         # %rdi = last - 1
+	shrq   $1, %rdi         # %rdi = (last - 1) / 2 (using shift instead of div)
+	rrmovq %rdi, %rbx       
 	
 ha_loop:
-	andq   %rbx, %rbx       # check if i < 0
+	andq   %rbx, %rbx       
 	jge     ha_continue
 	popq   %rbx
 	popq   %r12
 	ret
 
 ha_continue:
-	rrmovq %rbx, %rdi       # Set %rdi = i, %rsi = last      
+	rrmovq %rbx, %rdi       
 	rrmovq %r12, %rsi
-	pushq  %rdi
-	call   heapify_node     # Heapify the node
-        popq   %rdi
+	call   heapify_node     
 	
-	irmovq $1, %rdi         # i--
-	subq   %rdi, %rbx
+	subq   $1, %rbx         # i--
 	jmp    ha_loop
 	
 #
