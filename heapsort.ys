@@ -169,29 +169,28 @@ heapify_continue:
 #
 heapify_array:
 	pushq  %r12
+	pushq  %r13
 	pushq  %rbx
 	rrmovq %rdi, %r12
-
-	irmovq $1, %r10
-	subq   %r10, %rdi       # %rdi = last - 1
-	shrq   %r10, %rdi       # %rdi = (last - 1) / 2 (shift right by 1)
+	irmovq $1, %r13         # %r13 = 1 (callee-saved; survives calls)
+	subq   %r13, %rdi       # %rdi = last - 1
+	shrq   %r13, %rdi       # %rdi = (last - 1) / 2 (shift right by 1)
 	rrmovq %rdi, %rbx       
-	
+
 ha_loop:
-	andq   %rbx, %rbx       
-	jge     ha_continue
+	andq   %rbx, %rbx       # set flags on i; SF=1 if i < 0
+	jl     ha_done          # exit if i < 0
+	rrmovq %rbx, %rdi
+	rrmovq %r12, %rsi
+	call   heapify_node
+	subq   %r13, %rbx       # i-- (%r13=1, callee-saved so survives call)
+	jmp    ha_loop
+
+ha_done:
 	popq   %rbx
+	popq   %r13
 	popq   %r12
 	ret
-
-ha_continue:
-	rrmovq %rbx, %rdi       
-	rrmovq %r12, %rsi
-	call   heapify_node     
-	
-	irmovq $1, %r10
-	subq   %r10, %rbx       # i--
-	jmp    ha_loop
 	
 #
 # Extract_max
@@ -229,31 +228,30 @@ extract_max:
 #
 heapsort:
 	pushq  %rbx
-	irmovq $1, %rsi
-	subq   %rsi, %rdi	# %rdi is now the index of the last element
-	jle    hs_ret		# If there were 1 or 0 entries, we are done
+	pushq  %r13             # save %r13 (we'll use it as constant 1)
+	irmovq $1, %r13         # %r13 = 1 (callee-saved; survives all calls)
+	subq   %r13, %rdi       # %rdi = nelem - 1 (index of last element)
+	jle    hs_ret           # if nelem <= 1, nothing to sort
 	rrmovq %rdi, %rbx       # %rbx (i) = last
-	call   heapify_array    # heapify_array(last)
+	call   heapify_array    # build max-heap
 
 hs_loop:
-	andq   %rbx, %rbx	# Test if i < 0
-	jge     hs_continue
-hs_ret:	popq   %rbx
-	ret
+	andq   %rbx, %rbx       # set flags on i; SF=1 if i < 0
+	jl     hs_ret           # exit if i < 0
+	rrmovq %rbx, %rdi
+	call   extract_max      # max = extract_max(i); %rax = max value
 
-hs_continue:
-	rrmovq %rbx, %rdi       # max = extract_max(i)
-	call   extract_max
-
-	rrmovq %rbx, %rsi       # heap[i] = max
+	rrmovq %rbx, %rsi       # compute byte offset: i * 8
 	addq   %rsi, %rsi
 	addq   %rsi, %rsi
 	addq   %rsi, %rsi
-        rmmovq %rax, heap(%rsi)
+	rmmovq %rax, heap(%rsi) # heap[i] = max
 
-	irmovq $1, %rdi         # i--
-	subq   %rdi, %rbx
+	subq   %r13, %rbx       # i-- (%r13=1, survives calls)
 	jmp    hs_loop
+
+hs_ret:
+	popq   %r13
 	popq   %rbx
 	ret
 
@@ -262,13 +260,18 @@ hs_continue:
 #
 .pos 0x1000
 heap:	
-		.quad	0x3ab2f
-	.quad	0x37a8e
-	.quad	0xad7b5
-	.quad	0xc29d7
-	.quad	0x5843b
+	.quad	77
+	.quad	27
+	.quad	37
+	.quad	84
+	.quad	99
+	.quad	82
+	.quad	25
+	.quad	57
+	.quad	91
+	.quad	73
 
-size:   .quad 5
+size:   .quad 10
 	
 #
 # Stack (32 thirty-two bit words is more than enough here).
