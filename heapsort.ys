@@ -102,68 +102,127 @@ check_child_return_one:
 	ret
 
 #
-# Heapify_node
+# Heapify_node (fully inlined — no calls to check_child, get_element, swap)
 #     %rdi: index
 #     %rsi: last
 #
-# Local variables:
+# Callee-saved registers used:
 #     %rbx: index
-#     %r12: highest
-#     %r13: last
+#     %r12: last
+#     %r13: constant 1
+#     %r14: highest
+#     %rbp: heap[highest] value (cached)
 #
 heapify_node:
 	pushq  %rbx
 	pushq  %r12
 	pushq  %r13
-	rrmovq %rdi, %r12
-	rrmovq %rsi, %r13
-	rrmovq %rdi, %rbx
+	pushq  %r14
+	pushq  %rbp
+	rrmovq %rdi, %rbx       # index
+	rrmovq %rsi, %r12       # last
+	irmovq $1, %r13         # constant 1
 
 heapify_loop:
-	rrmovq %rbx, %rdi
-	addq   %rdi, %rdi       # left_child = 2 * index
-	irmovq $1, %r10
-	addq   %r10, %rdi       # left_child = 2 * index + 1
-	rrmovq %rdi, %r11       # save left_child index before call clobbers %rdi
-	rrmovq %r12, %rsi
-	rrmovq %r13, %rdx
+	# highest = index; load heap[index]
+	rrmovq %rbx, %r14       # highest = index
+	rrmovq %rbx, %r10
+	addq   %r10, %r10
+	addq   %r10, %r10
+	addq   %r10, %r10       # r10 = index * 8
+	mrmovq heap(%r10), %rbp # rbp = heap[index] = heap[highest]
 
-	call   check_child
-	andq   %rax, %rax
+	# --- left child = 2*index + 1 ---
+	rrmovq %rbx, %r8        # r8 = left_child index
+	addq   %r8, %r8
+	addq   %r13, %r8        # r8 = 2*index + 1
 
-	je     heapify_skip1
-	rrmovq %r11, %r12       # highest = left_child (use saved index)
+	# bounds check: left_child <= last?
+	rrmovq %r8, %r10
+	subq   %r12, %r10       # left - last
+	jg     hn_skip_right    # if left > last, right is also out of bounds
 
-heapify_skip1:
-	rrmovq %rbx, %rdi
-	addq   %rdi, %rdi       # right_child = 2 * index
-	irmovq $2, %r10
-	addq   %r10, %rdi       # right_child = 2 * index + 2
-	rrmovq %rdi, %r11       # save right_child index before call clobbers %rdi
-	rrmovq %r12, %rsi
-	rrmovq %r13, %rdx
+	# load heap[left_child]
+	rrmovq %r8, %r10
+	addq   %r10, %r10
+	addq   %r10, %r10
+	addq   %r10, %r10       # r10 = left_child * 8
+	mrmovq heap(%r10), %r11 # r11 = heap[left_child]
 
-	call   check_child
-	andq   %rax, %rax
-	je     heapify_skip2
-	rrmovq %r11, %r12       # highest = right_child (use saved index)
+	# if heap[highest] < heap[left_child]: highest = left_child
+	rrmovq %rbp, %r10
+	subq   %r11, %r10       # heap[highest] - heap[left_child]
+	jge    hn_skip_left     # if heap[highest] >= heap[left], skip
+	rrmovq %r8, %r14        # highest = left_child
+	rrmovq %r11, %rbp       # heap[highest] = heap[left_child]
 
-heapify_skip2:
-	rrmovq %r12, %rdi
-	subq   %rbx, %rdi
-	jne     heapify_continue
+hn_skip_left:
+	# --- right child = left_child + 1 ---
+	rrmovq %r8, %r9         # r9 = right_child index
+	addq   %r13, %r9        # r9 = left_child + 1 = 2*index + 2
+
+	# bounds check: right_child <= last?
+	rrmovq %r9, %r10
+	subq   %r12, %r10       # right - last
+	jg     hn_check_swap    # if right > last, skip to swap check
+
+	# load heap[right_child]
+	rrmovq %r9, %r10
+	addq   %r10, %r10
+	addq   %r10, %r10
+	addq   %r10, %r10       # r10 = right_child * 8
+	mrmovq heap(%r10), %r11 # r11 = heap[right_child]
+
+	# if heap[highest] < heap[right_child]: highest = right_child
+	rrmovq %rbp, %r10
+	subq   %r11, %r10       # heap[highest] - heap[right_child]
+	jge    hn_check_swap    # if heap[highest] >= heap[right], skip
+	rrmovq %r9, %r14        # highest = right_child
+	# (no need to update %rbp; we only compare going forward if we loop again)
+
+	jmp    hn_check_swap
+
+hn_skip_right:
+	# left > last means right > last too; fall through to check swap
+
+hn_check_swap:
+	# if highest == index, done
+	rrmovq %r14, %r10
+	subq   %rbx, %r10       # highest - index
+	je     hn_done          # if equal, no swap needed, exit
+
+	# --- inline swap(index, highest) ---
+	# heap[index] byte offset
+	rrmovq %rbx, %r10
+	addq   %r10, %r10
+	addq   %r10, %r10
+	addq   %r10, %r10       # r10 = index * 8
+
+	# heap[highest] byte offset
+	rrmovq %r14, %r11
+	addq   %r11, %r11
+	addq   %r11, %r11
+	addq   %r11, %r11       # r11 = highest * 8
+
+	# load both values
+	mrmovq heap(%r10), %r8  # r8 = heap[index]
+	mrmovq heap(%r11), %r9  # r9 = heap[highest]
+
+	# store swapped
+	rmmovq %r9, heap(%r10)  # heap[index] = heap[highest]
+	rmmovq %r8, heap(%r11)  # heap[highest] = heap[index]
+
+	# index = highest; continue sifting down
+	rrmovq %r14, %rbx
+	jmp    heapify_loop
+
+hn_done:
+	popq   %rbp
+	popq   %r14
 	popq   %r13
 	popq   %r12
 	popq   %rbx
 	ret
-
-heapify_continue:
-	rrmovq %r12, %rdi
-	rrmovq %rbx, %rsi
-	call   swap
-
-	rrmovq %r12, %rbx
-	jmp    heapify_loop
 
 #
 # Heapify_array
@@ -202,61 +261,50 @@ ha_done:
 	ret
 	
 #
-# Extract_max
-#     %rdi: last
-#
-extract_max:
-	pushq  %rbx		# Save %rax before using it for max
-
-        pushq  %rdi             # Save this as we'll need it later
-	xorq   %rdi, %rdi       # max = heap[0]
-	call   get_element
-	rrmovq %rax, %rbx
-
-	mrmovq 0(%rsp), %rdi    # Recover %rdi, but leave it on the stack too.
-	call   get_element
-
-	rrmovq %rax, %rsi       # heap[0] = %rax
-	xorq   %rdi, %rdi
-	call   put_element
-
-	popq   %rdi
-	rrmovq %rdi, %rsi	# %rsi = last - 1
-	irmovq $1, %rcx
-	subq   %rcx, %rsi
-	xorq   %rdi, %rdi       # %rdi = 0
-	call   heapify_node     # Heapify the root
-
-	rrmovq %rbx, %rax       # Set return value to max
-	popq   %rbx
-	ret
-
-#
-# Heapsort
+# Heapsort (with extract_max inlined)
 #    %rdi: Number of entries in the array
+#
+# Callee-saved registers:
+#   %rbx: i (loop counter, counts down from last to 0)
+#   %r12: reserved for heapify_node (last)
+#   %r13: constant 1
 #
 heapsort:
 	pushq  %rbx
-	pushq  %r13             # save %r13 (we'll use it as constant 1)
-	irmovq $1, %r13         # %r13 = 1 (callee-saved; survives all calls)
+	pushq  %r13
+	irmovq $1, %r13         # constant 1
 	subq   %r13, %rdi       # %rdi = nelem - 1 (index of last element)
 	jle    hs_ret           # if nelem <= 1, nothing to sort
 	rrmovq %rdi, %rbx       # %rbx (i) = last
 	call   heapify_array    # build max-heap
 
 hs_loop:
-	andq   %rbx, %rbx       # set flags on i; SF=1 if i < 0
+	andq   %rbx, %rbx       # set flags on i
 	jl     hs_ret           # exit if i < 0
-	rrmovq %rbx, %rdi
-	call   extract_max      # max = extract_max(i); %rax = max value
 
-	rrmovq %rbx, %rsi       # compute byte offset: i * 8
-	addq   %rsi, %rsi
-	addq   %rsi, %rsi
-	addq   %rsi, %rsi
-	rmmovq %rax, heap(%rsi) # heap[i] = max
+	# --- inlined extract_max(i) ---
+	xorq   %rdi, %rdi       # %rdi = 0 (used as base for heap[0], and later as index=0)
 
-	subq   %r13, %rbx       # i-- (%r13=1, survives calls)
+	# max = heap[0]
+	mrmovq heap(%rdi), %r10 # r10 = heap[0]
+
+	# heap[0] = heap[i]
+	rrmovq %rbx, %r11
+	addq   %r11, %r11
+	addq   %r11, %r11
+	addq   %r11, %r11       # r11 = i * 8
+	mrmovq heap(%r11), %r8  # r8 = heap[i]
+	rmmovq %r8, heap(%rdi)  # heap[0] = heap[i]
+
+	# heap[i] = max (r10)
+	rmmovq %r10, heap(%r11) # heap[i] = max
+
+	# heapify_node(0, i - 1)  (%rdi already = 0)
+	rrmovq %rbx, %rsi
+	subq   %r13, %rsi       # last = i - 1
+	call   heapify_node
+
+	subq   %r13, %rbx       # i--
 	jmp    hs_loop
 
 hs_ret:
