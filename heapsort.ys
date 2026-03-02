@@ -89,7 +89,7 @@ check_child:
 	call get_element
 
 	subq   %rcx, %rax
-	jg      check_child_return_one
+	jl     check_child_return_one  # return 1 if heap[highest] < heap[child]
 
 check_child_return_zero:
 	xorq   %rax, %rax
@@ -124,6 +124,7 @@ heapify_loop:
 	addq   %rdi, %rdi       # left_child = 2 * index
 	irmovq $1, %r10
 	addq   %r10, %rdi       # left_child = 2 * index + 1
+	rrmovq %rdi, %r11       # save left_child index before call clobbers %rdi
 	rrmovq %r12, %rsi
 	rrmovq %r13, %rdx
 
@@ -131,20 +132,21 @@ heapify_loop:
 	andq   %rax, %rax
 
 	je     heapify_skip1
-	rrmovq %rdi, %r12       
+	rrmovq %r11, %r12       # highest = left_child (use saved index)
 
 heapify_skip1:
 	rrmovq %rbx, %rdi
 	addq   %rdi, %rdi       # right_child = 2 * index
 	irmovq $2, %r10
 	addq   %r10, %rdi       # right_child = 2 * index + 2
+	rrmovq %rdi, %r11       # save right_child index before call clobbers %rdi
 	rrmovq %r12, %rsi
 	rrmovq %r13, %rdx
 
 	call   check_child
 	andq   %rax, %rax
 	je     heapify_skip2
-	rrmovq %rdi, %r12       
+	rrmovq %r11, %r12       # highest = right_child (use saved index)
 
 heapify_skip2:
 	rrmovq %r12, %rdi
@@ -267,16 +269,16 @@ hs_ret:
 #
 .pos 0x1000
 heap:	
-	.quad	77
-	.quad	27
-	.quad	37
-	.quad	84
-	.quad	99
-	.quad	82
-	.quad	25
-	.quad	57
-	.quad	91
-	.quad	73
+	.quad	15
+	.quad	45
+	.quad	71
+	.quad	17
+	.quad	50
+	.quad	58
+	.quad	13
+	.quad	48
+	.quad	61
+	.quad	90
 
 size:   .quad 10
 	
