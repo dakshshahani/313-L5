@@ -174,7 +174,7 @@ heapify_array:
 
 	irmovq $1, %r10
 	subq   %r10, %rdi       # %rdi = last - 1
-	shrq   $1, %rdi         # %rdi = (last - 1) / 2 (using shift instead of div)
+	shrq   %r10, %rdi       # %rdi = (last - 1) / 2 (shift right by 1)
 	rrmovq %rdi, %rbx       
 	
 ha_loop:
