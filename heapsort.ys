@@ -140,7 +140,7 @@ heapify_loop:
 	# bounds check: left_child <= last?
 	rrmovq %r8, %r10
 	subq   %r12, %r10       # left - last
-	jg     hn_skip_right    # if left > last, right is also out of bounds
+	jg     hn_check_swap    # if left > last, no children at all, skip to swap check
 
 	# load heap[left_child]
 	rrmovq %r8, %r10
@@ -149,14 +149,12 @@ heapify_loop:
 	addq   %r10, %r10       # r10 = left_child * 8
 	mrmovq heap(%r10), %r11 # r11 = heap[left_child]
 
-	# if heap[highest] < heap[left_child]: highest = left_child
+	# if heap[highest] < heap[left_child]: highest = left_child, update rbp
 	rrmovq %rbp, %r10
 	subq   %r11, %r10       # heap[highest] - heap[left_child]
-	jge    hn_skip_left     # if heap[highest] >= heap[left], skip
-	rrmovq %r8, %r14        # highest = left_child
-	rrmovq %r11, %rbp       # heap[highest] = heap[left_child]
+	cmovl  %r8, %r14        # if less: highest = left_child
+	cmovl  %r11, %rbp       # if less: heap[highest] = heap[left_child]
 
-hn_skip_left:
 	# --- right child = left_child + 1 ---
 	rrmovq %r8, %r9         # r9 = right_child index
 	addq   %r13, %r9        # r9 = left_child + 1 = 2*index + 2
@@ -176,14 +174,7 @@ hn_skip_left:
 	# if heap[highest] < heap[right_child]: highest = right_child
 	rrmovq %rbp, %r10
 	subq   %r11, %r10       # heap[highest] - heap[right_child]
-	jge    hn_check_swap    # if heap[highest] >= heap[right], skip
-	rrmovq %r9, %r14        # highest = right_child
-	# (no need to update %rbp; we only compare going forward if we loop again)
-
-	jmp    hn_check_swap
-
-hn_skip_right:
-	# left > last means right > last too; fall through to check swap
+	cmovl  %r9, %r14        # if less: highest = right_child
 
 hn_check_swap:
 	# if highest == index, done
@@ -246,13 +237,11 @@ heapify_array:
 	rrmovq %rdi, %rbx       # i = last
 
 ha_loop:
-	andq   %rbx, %rbx       # set flags on i; SF=1 if i < 0
-	jl     ha_done          # exit if i < 0
 	rrmovq %rbx, %rdi
 	rrmovq %r12, %rsi
 	call   heapify_node
-	subq   %r13, %rbx       # i--
-	jmp    ha_loop
+	subq   %r13, %rbx       # i--; sets flags
+	jge    ha_loop          # continue if i >= 0
 
 ha_done:
 	popq   %rbx
@@ -279,9 +268,6 @@ heapsort:
 	call   heapify_array    # build max-heap
 
 hs_loop:
-	andq   %rbx, %rbx       # set flags on i
-	jl     hs_ret           # exit if i < 0
-
 	# --- inlined extract_max(i) ---
 	xorq   %rdi, %rdi       # %rdi = 0 (used as base for heap[0], and later as index=0)
 
@@ -304,8 +290,8 @@ hs_loop:
 	subq   %r13, %rsi       # last = i - 1
 	call   heapify_node
 
-	subq   %r13, %rbx       # i--
-	jmp    hs_loop
+	subq   %r13, %rbx       # i--; sets flags
+	jge    hs_loop          # continue if i >= 0
 
 hs_ret:
 	popq   %r13
@@ -331,10 +317,30 @@ heap:
 size:   .quad 10
 	
 #
-# Stack (32 thirty-two bit words is more than enough here).
+# Stack (40 quad-words for safety with larger arrays).
 #
 .pos 0x3000
 top:	            .quad 0x00000000		# top of stack.
+                    .quad 0x00000000
+                    .quad 0x00000000
+                    .quad 0x00000000
+                    .quad 0x00000000
+                    .quad 0x00000000
+                    .quad 0x00000000
+                    .quad 0x00000000
+                    .quad 0x00000000
+                    .quad 0x00000000
+                    .quad 0x00000000
+                    .quad 0x00000000
+                    .quad 0x00000000
+                    .quad 0x00000000
+                    .quad 0x00000000
+                    .quad 0x00000000
+                    .quad 0x00000000
+                    .quad 0x00000000
+                    .quad 0x00000000
+                    .quad 0x00000000
+                    .quad 0x00000000
                     .quad 0x00000000
                     .quad 0x00000000
                     .quad 0x00000000
