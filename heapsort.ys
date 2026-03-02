@@ -122,7 +122,8 @@ heapify_node:
 heapify_loop:
 	rrmovq %rbx, %rdi
 	addq   %rdi, %rdi       # left_child = 2 * index
-	addq   $1, %rdi         # left_child = 2 * index + 1
+	irmovq $1, %r10
+	addq   %r10, %rdi       # left_child = 2 * index + 1
 	rrmovq %r12, %rsi
 	rrmovq %r13, %rdx
 
@@ -135,7 +136,8 @@ heapify_loop:
 heapify_skip1:
 	rrmovq %rbx, %rdi
 	addq   %rdi, %rdi       # right_child = 2 * index
-	addq   $2, %rdi         # right_child = 2 * index + 2
+	irmovq $2, %r10
+	addq   %r10, %rdi       # right_child = 2 * index + 2
 	rrmovq %r12, %rsi
 	rrmovq %r13, %rdx
 
@@ -170,7 +172,8 @@ heapify_array:
 	pushq  %rbx
 	rrmovq %rdi, %r12
 
-	subq   $1, %rdi         # %rdi = last - 1
+	irmovq $1, %r10
+	subq   %r10, %rdi       # %rdi = last - 1
 	shrq   $1, %rdi         # %rdi = (last - 1) / 2 (using shift instead of div)
 	rrmovq %rdi, %rbx       
 	
@@ -186,7 +189,8 @@ ha_continue:
 	rrmovq %r12, %rsi
 	call   heapify_node     
 	
-	subq   $1, %rbx         # i--
+	irmovq $1, %r10
+	subq   %r10, %rbx       # i--
 	jmp    ha_loop
 	
 #
@@ -225,7 +229,7 @@ extract_max:
 #
 heapsort:
 	pushq  %rbx
-	irmovq 1, %rsi
+	irmovq $1, %rsi
 	subq   %rsi, %rdi	# %rdi is now the index of the last element
 	jle    hs_ret		# If there were 1 or 0 entries, we are done
 	rrmovq %rdi, %rbx       # %rbx (i) = last
