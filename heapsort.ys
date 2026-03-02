@@ -78,33 +78,27 @@ swap:	pushq  %r12             # Callee save register
 check_child:
 	pushq  %rbx
 
-	rrmovq %rdi, %rbx       # if child <= last, we can continue
+	rrmovq %rdi, %rbx
 	subq   %rdx, %rbx
-	jle     check_child_continue
+	jg      check_child_return_zero
 
-	xorq %rax, %rax
-	popq %rbx
-	ret
-
-check_child_continue:
-	call get_element       # get heap[child]
+	call get_element
 	rrmovq %rax, %rcx
 
-	rrmovq %rsi, %rdi      # get heap[highest]
-	call get_element      
-	rrmovq %rax, %rbx
+	rrmovq %rsi, %rdi
+	call get_element
 
-	subq   %rbx, %rcx      # if heap[child] > heap[highest], return 1
-	jg     check_child_output_one
-	
-	xorq   %rax, %rax      # return 0
-	jmp check_child_finish
+	subq   %rcx, %rax
+	jg      check_child_return_one
 
-check_child_output_one:        # return 1
-	irmovq $1,   %rax
+check_child_return_zero:
+	xorq   %rax, %rax
+	popq   %rbx
+	ret
 
-check_child_finish:
-	popq %rbx
+check_child_return_one:
+	irmovq $1, %rax
+	popq   %rbx
 	ret
 
 #
